@@ -31,12 +31,16 @@ class Circle:
         self.vy = vy
         self.radius = radius
         self.color = color
+        self.is_dragging = False
+        self.drag_offset = (0, 0)
 
 
     def update(self, screen_width:float, screen_height:float):
-        
-        gravity_update(self)
-        self.wall_collision(screen_width, screen_height)
+        if not self.is_dragging:
+            gravity_update(self)
+            # motiom of the ball
+            self.x += self.vx * dt
+            self.wall_collision(screen_width, screen_height)
 
 
     def wall_collision(self, screen_width:float, screen_height:float, restitution:float=0.8):
@@ -56,6 +60,47 @@ class Circle:
         elif self.y + self.radius >= screen_height:
             self.y = screen_height - self.radius
             self.vy = -self.vy * restitution
+
+
+    def pointer_inside_circle(self, px, py) -> bool:
+        # Returns True if pointer is inside the cicle
+        dx = px - self.x
+        dy = py - self.y
+        return dx*dx + dy*dy <= self.radius * self.radius
+
+
+
+    def mouse_control(self, events):
+        for event in events:
+            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                if self.pointer_inside_circle(event.pos[0], event.pos[1]):
+                    self.is_dragging = True
+                    self.drag_offset = (event.pos[0] - self.x, event.pos[1] - self.y)
+                    self._prev_mouse_pos = event.pos
+                    self._drag_v = (0.0, 0.0)
+
+            elif event.type == pygame.MOUSEMOTION and self.is_dragging:
+                # Update circle position
+                self.x = event.pos[0] - self.drag_offset[0]
+                self.y = event.pos[1] - self.drag_offset[1]
+
+                # Calculate Velocity for ball, regarding momentum even after the mouse has been released
+                # and stores it
+                dx = event.pos[0] - self._prev_mouse_pos[0]
+                dy = event.pos[1] - self._prev_mouse_pos[1]
+                if dt > 0:
+                    self._drag_v = (dx / dt, dy / dt)
+                self._prev_mouse_pos = event.pos
+
+            elif event.type == pygame.MOUSEBUTTONUP and  event.button == 1:
+                if self.pointer_inside_circle(event.pos[0], event.pos[1]):
+                    self.is_dragging = False
+
+                    # Once mouse is released, set circle velocity to the last updated drag velocity
+                    if hasattr(self, '_drag_v'):
+                        print(self._drag_v)
+                        self.vx, self.vy = self._drag_v 
+                        print(f"{self.vx}, velocity_'X'_axis")
 
 
     def draw(self, surface: pygame.Surface) -> None:
@@ -82,21 +127,30 @@ def main() -> None:
     pygame.init()
     pygame.display.set_caption(TITLE_NAME)
     screen = pygame.display.set_mode(screen_size, pygame.RESIZABLE)
-    circle = Circle(400, 300, 50, (0, 255, 0))
+    circle_1 = Circle(400, 300, 50, (0, 255, 0))
+    circle_2 = Circle(200, 300, 50, (0, 0, 244))
 
     running = True
     while running:
-        for event in pygame.event.get():
+        events = pygame.event.get()
+        for event in events:
             # if event.type == pygame.KEYDOWN and event.key == pygame.K_r:  # Press 'R' to restart
             #     main()  # Restart the game by calling the main function again
-            if event.type == pygame.QUIT:
+            if event.type == pygame.QUIT or (event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE):
                 running = False
             elif event.type == pygame.VIDEORESIZE:
                 screen = pygame.display.set_mode(event.size, pygame.RESIZABLE)
         screen.fill((0, 0, 0))
         w, h = screen.get_size()
-        circle.update(w, h)
-        circle.draw(screen)
+
+        circle_1.update(w, h)
+        circle_1.mouse_control(events)
+        circle_1.draw(screen)
+
+        circle_2.update(w, h)
+        circle_2.mouse_control(events)
+        circle_2.draw(screen)
+
         draw_border(screen, (255, 0, 0), 2, 40)
         pygame.display.flip()
         clock.tick(60)
