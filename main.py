@@ -1,4 +1,5 @@
 import pygame
+import pygame_gui
 import numpy as np
 
 TITLE_NAME:str = "pyPhysics nGine"
@@ -24,7 +25,7 @@ def gravity_update(obj) -> tuple:
 
 # Draw circle
 class Circle:
-    def __init__(self, x:float, y:float, radius:float, color:tuple, vx:float=0.0, vy: float=0.0):
+    def __init__(self, x:float, y:float, radius:float=20, color:tuple=(0, 255, 0), vx:float=0.0, vy: float=0.0):
         self.x = x
         self.y = y
         self.vx = vx
@@ -35,7 +36,7 @@ class Circle:
         self.drag_offset = (0, 0)
 
 
-    def update(self, screen_width:float, screen_height:float):
+    def update(self, screen_width:float, screen_height:float) -> None:
         if not self.is_dragging:
             gravity_update(self)
             # motiom of the ball
@@ -43,7 +44,7 @@ class Circle:
             self.wall_collision(screen_width, screen_height)
 
 
-    def wall_collision(self, screen_width:float, screen_height:float, restitution:float=0.8):
+    def wall_collision(self, screen_width:float, screen_height:float, restitution:float=0.8) -> None:
         
         # left and right walls
         if self.x - self.radius <= 0:
@@ -70,7 +71,7 @@ class Circle:
 
 
 
-    def mouse_control(self, events):
+    def mouse_control(self, events) -> None:
         for event in events:
             if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                 if self.pointer_inside_circle(event.pos[0], event.pos[1]):
@@ -98,9 +99,7 @@ class Circle:
 
                     # Once mouse is released, set circle velocity to the last updated drag velocity
                     if hasattr(self, '_drag_v'):
-                        print(self._drag_v)
                         self.vx, self.vy = self._drag_v 
-                        print(f"{self.vx}, velocity_'X'_axis")
 
 
     def draw(self, surface: pygame.Surface) -> None:
@@ -127,8 +126,39 @@ def main() -> None:
     pygame.init()
     pygame.display.set_caption(TITLE_NAME)
     screen = pygame.display.set_mode(screen_size, pygame.RESIZABLE)
-    circle_1 = Circle(400, 300, 50, (0, 255, 0))
-    circle_2 = Circle(200, 300, 50, (0, 0, 244))
+
+    # Create a UIManager instance to manage UI elements
+    manager = pygame_gui.UIManager((300, 300))
+
+    # Create a button
+    circle_total_entry_box = pygame_gui.elements.UITextEntryLine(
+        relative_rect=pygame.Rect((100, 100), (200, 50)),
+        manager=manager
+    )
+
+    set_circle_count_button = pygame_gui.elements.UIButton(
+    relative_rect=pygame.Rect((210, 70), (90, 30)),
+    text="Set Circles",
+    manager=manager
+    )
+
+    gravity_slider_label = pygame_gui.elements.UILabel(
+        relative_rect=pygame.Rect((50, 180), (150, 20)),  # Position label above slider
+        text='Gravity',
+        manager=manager
+    )
+    gravity_slider = pygame_gui.elements.UIHorizontalSlider(
+        relative_rect=pygame.Rect((100, 200), (200, 50)),
+        start_value=9.8,
+        value_range=(-10.0, 50.0),
+        manager=manager
+    )
+
+    circles  = [] 
+    number_of_circles = 2
+    
+    for i in range(number_of_circles):
+        circles.append(Circle(100 + i*100, 500))
 
     running = True
     while running:
@@ -140,16 +170,41 @@ def main() -> None:
                 running = False
             elif event.type == pygame.VIDEORESIZE:
                 screen = pygame.display.set_mode(event.size, pygame.RESIZABLE)
+            elif event.type == pygame.USEREVENT:
+                if event.user_type == pygame_gui.UI_HORIZONTAL_SLIDER_MOVED and event.ui_element == gravity_slider:
+                    print("update gravity")
+                    global gravity_pixels
+                    gravity_pixels = event.value * 152 
+                if event.user_type == pygame_gui.UI_BUTTON_PRESSED and event.ui_element == set_circle_count_button:
+                    
+                    try:
+                        user_input = int(circle_total_entry_box.get_text()) 
+                        number_of_circles = user_input if user_input > 0 else number_of_circles
+                        
+                        circles = []
+                        for i in range(number_of_circles):
+                            circles.append(Circle(100 + i*100, 500))
+                    except ValueError:
+                        # Handle invalid input
+                        # need to work on adding a pop up message to only provide integer
+                        print("Please enter a valid integer")
+
+            
+            manager.process_events(event)
+
+
         screen.fill((0, 0, 0))
         w, h = screen.get_size()
 
-        circle_1.update(w, h)
-        circle_1.mouse_control(events)
-        circle_1.draw(screen)
 
-        circle_2.update(w, h)
-        circle_2.mouse_control(events)
-        circle_2.draw(screen)
+        for circle in circles:
+            circle.update(w, h)
+            circle.mouse_control(events)
+            circle.draw(screen)
+
+        # UI screen update
+        manager.update(dt)
+        manager.draw_ui(screen)
 
         draw_border(screen, (255, 0, 0), 2, 40)
         pygame.display.flip()
