@@ -11,6 +11,7 @@ dt = clock.tick(60) / 1000.0
 # this conversion is done so that in the future when there are UI inputs from the user, it can be changed realtime
 # and updated as the engine is being used
 gravity_pixels = GRAVITY_MS2 * 152 # 152 is the amount of pixels that equals a meter
+air_resistance_value = 0.999
 
 def gravity_update(obj) -> tuple:
     """
@@ -22,6 +23,20 @@ def gravity_update(obj) -> tuple:
     # x  += vx * dt
     obj.y  += obj.vy * dt
     return obj.vy, obj.y
+
+
+def air_resistance(obj) -> tuple:
+    """
+        dt      = elapsed time in seconds since last update
+        air_resistance = coefficient of air resistance (pixels/second squared)
+    """
+    # obj.vx *= 0.999 # Air resistance
+    obj.vx -= air_resistance_value * dt
+    obj.vy -= air_resistance_value * dt
+    if abs(obj.vx) < 5: # apply floor friction
+        obj.vx = 0.0
+    return obj.vx, obj.vy
+
 
 # Draw circle
 class Circle:
@@ -39,6 +54,7 @@ class Circle:
     def update(self, screen_width:float, screen_height:float) -> None:
         if not self.is_dragging:
             gravity_update(self)
+            air_resistance(self)
             # motiom of the ball
             self.x += self.vx * dt
             self.wall_collision(screen_width, screen_height)
@@ -54,13 +70,23 @@ class Circle:
             self.x = screen_width - self.radius
             self.vx = -self.vx * restitution
  
-        # Top and bottom walls
+        # Top 
         if self.y - self.radius <= 0:
             self.y = self.radius
             self.vy = -self.vy * restitution
+        
+        # Bottoom Wall
         elif self.y + self.radius >= screen_height:
             self.y = screen_height - self.radius
             self.vy = -self.vy * restitution
+            self.apply_floor_friction()
+
+    def apply_floor_friction(self):
+        # friction is applied when circle touches the wall 
+        friction_coeff = 0.98
+        self.vx *= friction_coeff
+        if abs(self.vx) < 0.5: # stop jittering
+            self.vx = 0
 
 
     def pointer_inside_circle(self, px, py) -> bool:
@@ -68,7 +94,6 @@ class Circle:
         dx = px - self.x
         dy = py - self.y
         return dx*dx + dy*dy <= self.radius * self.radius
-
 
 
     def mouse_control(self, events) -> None:
@@ -122,7 +147,7 @@ def draw_border(screen, color, width, margin=10):
 
 def main() -> None:
 
-    screen_size = 1200, 1200
+    screen_size = 1200, 800
     pygame.init()
     pygame.display.set_caption(TITLE_NAME)
     screen = pygame.display.set_mode(screen_size, pygame.RESIZABLE)
@@ -172,7 +197,6 @@ def main() -> None:
                 screen = pygame.display.set_mode(event.size, pygame.RESIZABLE)
             elif event.type == pygame.USEREVENT:
                 if event.user_type == pygame_gui.UI_HORIZONTAL_SLIDER_MOVED and event.ui_element == gravity_slider:
-                    print("update gravity")
                     global gravity_pixels
                     gravity_pixels = event.value * 152 
                 if event.user_type == pygame_gui.UI_BUTTON_PRESSED and event.ui_element == set_circle_count_button:
