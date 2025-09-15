@@ -1,6 +1,8 @@
+import math
+import numpy as np
 import pygame
 import pygame_gui
-import numpy as np
+import random
 
 TITLE_NAME:str = "pyPhysics nGine"
 GRAVITY_MS2:float = 9.8
@@ -38,6 +40,41 @@ def air_resistance(obj) -> tuple:
     return obj.vx, obj.vy
 
 
+
+def resolve_circle_collision(c1, c2):
+    # Vector between centers
+    dx = c2.x - c1.x
+    dy = c2.y - c1.y
+    distance = math.hypot(dx, dy)
+    if distance == 0:
+        return  # Prevent division by zero, or optionally jitter the objects apart
+
+    # Minimum translation distance to push balls apart
+    overlap = (c1.radius + c2.radius) - distance
+    nx = dx / distance
+    ny = dy / distance
+
+    # Push them apart
+    c1.x -= nx * overlap / 2
+    c1.y -= ny * overlap / 2
+    c2.x += nx * overlap / 2
+    c2.y += ny * overlap / 2
+
+    # Velocity difference along normal
+    dvx = c2.vx - c1.vx
+    dvy = c2.vy - c1.vy
+    vn = dvx * nx + dvy * ny
+
+    if vn > 0:
+        return  # They are moving apart already
+
+    # Elastic collision response for equal mass and radius
+    c1.vx += vn * nx
+    c1.vy += vn * ny
+    c2.vx -= vn * nx
+    c2.vy -= vn * ny
+
+
 # Draw circle
 class Circle:
     def __init__(self, x:float, y:float, radius:float=20, color:tuple=(0, 255, 0), vx:float=0.0, vy: float=0.0):
@@ -62,19 +99,19 @@ class Circle:
 
     def wall_collision(self, screen_width:float, screen_height:float, restitution:float=0.8) -> None:
         
-        # left and right walls
+        # Left 
         if self.x - self.radius <= 0:
             self.x = self.radius
             self.vx = -self.vx * restitution
+        # Right
         elif self.x + self.radius >= screen_width:
             self.x = screen_width - self.radius
-            self.vx = -self.vx * restitution
+            self.vx = -self.vx * restitution 
  
         # Top 
         if self.y - self.radius <= 0:
             self.y = self.radius
             self.vy = -self.vy * restitution
-        
         # Bottoom Wall
         elif self.y + self.radius >= screen_height:
             self.y = screen_height - self.radius
@@ -145,6 +182,20 @@ def draw_border(screen, color, width, margin=10):
     pygame.draw.line(screen, (255, 160, 0), (w // 2, 0), (w // 2, h), 1)
 
 
+def collision_detection(circles: list) -> None:
+     
+    for i in range(len(circles)):
+        for j in range(i + 1, len(circles)):
+            c1 = circles[i]
+            c2 = circles[j]
+            dx = c2.x - c1.x
+            dy = c2.y - c1.y
+            distance_sq = dx ** 2 + dy ** 2
+            radii_sum = c1.radius + c2.radius
+            if distance_sq <= radii_sum ** 2:
+                resolve_circle_collision(c1, c2)
+
+
 def main() -> None:
 
     screen_size = 1200, 800
@@ -188,6 +239,7 @@ def main() -> None:
     running = True
     while running:
         events = pygame.event.get()
+        w, h = screen.get_size()
         for event in events:
             # if event.type == pygame.KEYDOWN and event.key == pygame.K_r:  # Press 'R' to restart
             #     main()  # Restart the game by calling the main function again
@@ -207,7 +259,7 @@ def main() -> None:
                         
                         circles = []
                         for i in range(number_of_circles):
-                            circles.append(Circle(100 + i*100, 500))
+                            circles.append(Circle(random.randrange(50, w, 31), random.randrange(50, h, 50)))
                     except ValueError:
                         # Handle invalid input
                         # need to work on adding a pop up message to only provide integer
@@ -216,13 +268,11 @@ def main() -> None:
             
             manager.process_events(event)
 
-
         screen.fill((0, 0, 0))
-        w, h = screen.get_size()
-
 
         for circle in circles:
             circle.update(w, h)
+            collision_detection(circles)
             circle.mouse_control(events)
             circle.draw(screen)
 
