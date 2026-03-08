@@ -1,5 +1,7 @@
 # Physics N_gine
 
+![Example Image 1](./reference/example_image_1)
+
 ## Installation
 
 setup an environment for python
@@ -18,10 +20,10 @@ activate environment with:
 To install Physics N_gine, you can use pip:
 
 ```bash
-    pip install pygame pygame_gui
+    pip install pygame-ce pygame_gui
 ```
 
-or install through the requirment.txt file
+or install through the requirments.txt file
 
 ```bash
     pip install requiements.txt
